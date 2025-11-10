@@ -3,6 +3,7 @@ import logging
 
 # Installed packages (via pip)
 from django.apps import apps
+from django.contrib.auth.models import User
 if apps.is_installed('uchileedxlogin'):
     from uchileedxlogin.services.interface import (
         get_doc_id_by_user_id as uchileedxlogin_get_doc_id_by_user_id,
@@ -12,7 +13,6 @@ if apps.is_installed('uchileedxlogin'):
         PhApiException as UchileedxloginPhApiException,
         EmailException as UchileedxloginEmailException
     )
-    from uchileedxlogin.services.utils import get_document_type as uchileedxlogin_get_document_type
     MODEL_USED = 'uchileedxlogin'
 elif apps.is_installed('eol_sso_login'):
     from eol_sso_login.models import SSOLoginExtraData
@@ -35,38 +35,51 @@ class EmailException(Exception):
     edx user.
     """
 
-def get_doc_id_by_user_id(user_id):
+def get_indiv_id(user_id):
     """
-    Return the document id associated with the user. If there is not a user with that id, returns None.
+    Gets the indiv_id associated with user_id.
+    Note: Documents of type DNI are not considered in the case of eol_sso_login since eol_sso
+    doesn't support that type. Therefore, if a user has an indiv_id of that type, it's going to
+    return None.
     """
     if MODEL_USED == 'uchileedxlogin':
         return uchileedxlogin_get_doc_id_by_user_id(user_id)
     elif MODEL_USED == 'eol_sso_login':
         try:
-            doc_id = SSOLoginExtraData.objects.values_list('document', flat=True).get(user__id=user_id)
-            return doc_id
+            indiv_id = SSOLoginExtraData.objects.values_list('document').get(type_document__in=['rut', 'passport'], user__id=user_id)
+            return indiv_id
         except SSOLoginExtraData.DoesNotExist:
             return None
 
-def get_user_id_doc_id_pairs(user_ids):
+def get_user_id_with_indiv_id_list(user_id_list):
     """
-    Returns a list containing the pairs user_id/doc_id associated with the users in user_ids.
+    Returns a list containing pairs user_id/indiv_id associated with the users in user_id_list.
+    Note: Documents of type DNI are not considered in the case of eol_sso_login since eol_sso
+    doesn't support that type. Therefore, if a user has an indiv_id of that type, it's going
+    to return None.
     """
     if MODEL_USED == 'uchileedxlogin':
-        return uchileedxlogin_get_user_id_doc_id_pairs(user_ids)
+        return uchileedxlogin_get_user_id_doc_id_pairs(user_id_list)
     elif MODEL_USED == 'eol_sso_login':
-        users_doc_id_pairs = SSOLoginExtraData.objects.filter(user__id__in=user_ids).values_list('user__id', 'document')
-        return users_doc_id_pairs
+        user_id_with_indiv_id_list = SSOLoginExtraData.objects.filter(type_document__in=['rut', 'passport'], user__id__in=user_id_list).values_list('user__id', 'document')
+        return user_id_with_indiv_id_list
 
-def get_user_by_doc_id(doc_id, doc_type):
+def get_user_by_indiv_id(indiv_id):
     """
-    Get the user associated with doc_id, if it doesn't exists, return None.
-    Doesn't work with eol_sso_login.
+    Get the user associated with indiv_id, if it doesn't exist, return None.
     """
     if MODEL_USED == 'uchileedxlogin':
-        return uchileedxlogin_get_user_by_doc_id(doc_id)
+        edxloginuser = uchileedxlogin_get_user_by_doc_id(indiv_id)
+        if edxloginuser is None:
+            return None
+        else:
+            return edxloginuser.user
     elif MODEL_USED == 'eol_sso_login':
-        raise NotImplementedError("Not supported")
+        try:
+            user = User.objects.get(ssologinextradata__document=indiv_id, ssologinextradata__type_document__in=['rut', 'passport'])
+            return user
+        except User.DoesNotExist:
+            return None
 
 def sso_user_factory(value, value_type):
     """
@@ -85,16 +98,3 @@ def sso_user_factory(value, value_type):
             raise EmailException()
     else:
         raise NotImplementedError("Not supported")
-
-def get_document_type(doc_id):
-    """
-    Get the document type of a document id.
-    """
-    if MODEL_USED == 'uchileedxlogin':
-        return uchileedxlogin_get_document_type(doc_id)
-    elif MODEL_USED == 'eol_sso_login':
-        try:
-            document_type = SSOLoginExtraData.objects.get(document=doc_id).type_document
-            return document_type
-        except SSOLoginExtraData.DoesNotExist:
-            return None
