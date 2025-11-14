@@ -46,7 +46,7 @@ def get_indiv_id(user_id):
         return uchileedxlogin_get_doc_id_by_user_id(user_id)
     elif MODEL_USED == 'eol_sso_login':
         try:
-            indiv_id = SSOLoginExtraData.objects.values_list('document').get(type_document__in=['rut', 'passport'], user__id=user_id)
+            indiv_id = SSOLoginExtraData.objects.values_list('document', flat=True).get(type_document__in=['rut', 'passport'], user__id=user_id)
             return indiv_id
         except SSOLoginExtraData.DoesNotExist:
             return None
