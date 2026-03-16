@@ -3,7 +3,7 @@ from django.db import models
 
 class UserSso(models.Model):
     indiv_id = models.CharField(max_length=20, unique=True, db_index=True)
-    id_persona = models.IntegerField(unique=True, db_index=True)
+    id_persona = models.IntegerField(unique=True, db_index=True, null=True, blank=True)
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE)
