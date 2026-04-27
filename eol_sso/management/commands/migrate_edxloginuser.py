@@ -10,7 +10,7 @@ from uchileedxlogin.services.interface import EdxLoginUser
 # Internal project dependencies
 from ._migrate_eol_sso import BaseMigrationCommand
 from ...models import UserSso
-
+from ...ph_query import get_user_data_by_indiv_id
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class Command(BaseMigrationCommand):
             api_results = {}
             if linked_users:
                 try:
-                    api_results = self.get_user_data_uchileedxlogin(linked_users)
+                    api_results = get_user_data_by_indiv_id(linked_users)
                 except Exception as e:
                     logger.error(f"Error with the PH API call, error: {e}")
                     break
@@ -95,18 +95,3 @@ class Command(BaseMigrationCommand):
             if sleep_time > 0:
                 time.sleep(sleep_time)
         logger.info("Edxloginuser migration complete")
-
-    def get_user_data_uchileedxlogin(self, query_values):
-        """
-        get_user_data wrapper for the case when needing user information about users from
-        uchileedxlogin
-        """
-        data = self.get_user_data(query_values, 'indiv_id')
-        # Iterate over the users
-        user_data = {}
-        for user in data["data"]["getRowsPersona"]['persona']:
-            user_data[user['indiv_id']] = {
-                'indiv_id': user['indiv_id'],
-                'id_persona': user['id_persona']
-            }
-        return user_data
