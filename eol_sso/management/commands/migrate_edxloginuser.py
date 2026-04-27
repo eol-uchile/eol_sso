@@ -30,13 +30,12 @@ class Command(BaseMigrationCommand):
         sleep_time = options['sleep']
         dry_run = options['dry_run']
 
-        latest_user = UserSso.objects.order_by('-created').first()
-        starter_id = latest_user.user.edxloginuser.id if latest_user else 0
-        
-        queryset = EdxLoginUser.objects.filter(id__gt=starter_id).select_related('user').order_by('id')
+        queryset = EdxLoginUser.objects.filter(
+                                user__usersso__isnull=True
+                            ).order_by('id')
         stream = queryset.iterator(chunk_size=batch_size)
         
-        logger.info(f"Starting EdxLoginUser migration from id: {starter_id}")
+        logger.info(f"Starting EdxLoginUser migration")
 
         while True:
             batch = list(islice(stream, batch_size))
@@ -61,7 +60,7 @@ class Command(BaseMigrationCommand):
                 if not record.have_sso:
                     new_entries.append(UserSso(
                                 indiv_id=record.run,
-                                user=record.user
+                                user_id=record.user_id
                             ))
                 # If the user does have a linked uchile account, retrieve its data from the
                 # PH API response and add it to new_entries. If the user is not found in the
@@ -81,7 +80,7 @@ class Command(BaseMigrationCommand):
                         logger.warning(f'The user {record} could not be found in the PH API.')
             try:
                 with transaction.atomic():
-                    UserSso.objects.bulk_create(new_entries)
+                    UserSso.objects.bulk_create(new_entries, ignore_conflicts=True)
                     if dry_run:
                         transaction.set_rollback(True)
                 logger.info(f"Successful insertion: IDs {batch[0].id} to {batch[-1].id}")
