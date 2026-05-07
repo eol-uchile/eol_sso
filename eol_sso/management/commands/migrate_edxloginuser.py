@@ -10,7 +10,7 @@ from uchileedxlogin.services.interface import EdxLoginUser
 # Internal project dependencies
 from ._migrate_eol_sso import BaseMigrationCommand
 from ...models import UserSso
-
+from ...ph_query import get_user_data_by_indiv_id
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +30,12 @@ class Command(BaseMigrationCommand):
         sleep_time = options['sleep']
         dry_run = options['dry_run']
 
-        latest_user = UserSso.objects.order_by('-created').first()
-        starter_id = latest_user.user.edxloginuser.id if latest_user else 0
-        
-        queryset = EdxLoginUser.objects.filter(id__gt=starter_id).select_related('user').order_by('id')
+        queryset = EdxLoginUser.objects.filter(
+                                user__usersso__isnull=True
+                            ).order_by('id')
         stream = queryset.iterator(chunk_size=batch_size)
         
-        logger.info(f"Starting EdxLoginUser migration from id: {starter_id}")
+        logger.info(f"Starting EdxLoginUser migration")
 
         while True:
             batch = list(islice(stream, batch_size))
@@ -49,7 +48,7 @@ class Command(BaseMigrationCommand):
             api_results = {}
             if linked_users:
                 try:
-                    api_results = self.get_user_data_uchileedxlogin(linked_users)
+                    api_results = get_user_data_by_indiv_id(linked_users)
                 except Exception as e:
                     logger.error(f"Error with the PH API call, error: {e}")
                     break
@@ -61,7 +60,7 @@ class Command(BaseMigrationCommand):
                 if not record.have_sso:
                     new_entries.append(UserSso(
                                 indiv_id=record.run,
-                                user=record.user
+                                user_id=record.user_id
                             ))
                 # If the user does have a linked uchile account, retrieve its data from the
                 # PH API response and add it to new_entries. If the user is not found in the
@@ -81,7 +80,7 @@ class Command(BaseMigrationCommand):
                         logger.warning(f'The user {record} could not be found in the PH API.')
             try:
                 with transaction.atomic():
-                    UserSso.objects.bulk_create(new_entries)
+                    UserSso.objects.bulk_create(new_entries, ignore_conflicts=True)
                     if dry_run:
                         transaction.set_rollback(True)
                 logger.info(f"Successful insertion: IDs {batch[0].id} to {batch[-1].id}")
@@ -95,18 +94,3 @@ class Command(BaseMigrationCommand):
             if sleep_time > 0:
                 time.sleep(sleep_time)
         logger.info("Edxloginuser migration complete")
-
-    def get_user_data_uchileedxlogin(self, query_values):
-        """
-        get_user_data wrapper for the case when needing user information about users from
-        uchileedxlogin
-        """
-        data = self.get_user_data(query_values, 'indiv_id')
-        # Iterate over the users
-        user_data = {}
-        for user in data["data"]["getRowsPersona"]['persona']:
-            user_data[user['indiv_id']] = {
-                'indiv_id': user['indiv_id'],
-                'id_persona': user['id_persona']
-            }
-        return user_data
