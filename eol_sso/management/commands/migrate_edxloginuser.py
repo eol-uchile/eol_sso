@@ -30,6 +30,27 @@ class Command(BaseMigrationCommand):
         sleep_time = options['sleep']
         dry_run = options['dry_run']
 
+        # Clean up broken links between EdxLoginUser and UserSso
+        broken_sso_records = UserSso.objects.filter(
+            id_persona__isnull=True,
+            user__edxloginuser__have_sso=True
+        )
+        for sso_id, u_id in broken_sso_records.values_list('id', 'user_id'):
+            logger.warning(
+                f"Deleting broken UserSSO: ID={sso_id}, UserID={u_id}"
+            )
+        # Delete broken links from UserSso, unless its a dry run
+        if not dry_run:
+            try:
+                total_deleted, _ = broken_sso_records.delete()
+                logger.info(f"Cleanup: Successfully deleted {total_deleted} records.")
+            except Exception as e:
+                logger.error(f"Error during pre-migration cleanup: {e}")
+                return
+        else:
+            broken_count = broken_sso_records.count()
+            logger.info(f"Dry run. {broken_count} records would have been deleted.")
+
         queryset = EdxLoginUser.objects.filter(
                                 user__usersso__isnull=True
                             ).order_by('id')

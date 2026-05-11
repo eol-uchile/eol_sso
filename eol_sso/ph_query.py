@@ -64,9 +64,15 @@ def get_user_data_by_indiv_id(query_values):
         by indiv_id
         """
         data = _get_user_data(query_values, 'indiv_id')
+        rows_persona = data.get("data", {}).get("getRowsPersona", {})    
+        api_message = rows_persona.get("message", "")
+        if "Persona SRCEI" in api_message:
+            logger.info(f"PH API returned info from SRCEI for {query_values}, not info associated with the actual account.")
+            return {}
         # Iterate over the users
         user_data = {}
-        for user in data["data"]["getRowsPersona"]['persona']:
+        persona_list = rows_persona.get('persona', [])
+        for user in persona_list:
             user_data[user['indiv_id']] = {
                 'indiv_id': user['indiv_id'],
                 'id_persona': user['id_persona']
