@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="eol_sso",
-    version="1.3.1",
+    version="1.4.0",
     author="EOL Uchile",
     author_email="eol-ing@uchile.cl",
     description="Middleware between apps and uchileedxlogin/eol_sso_login",
