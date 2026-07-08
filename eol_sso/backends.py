@@ -14,6 +14,7 @@ class UchileOAuth2Backend(BaseOAuth2):
     ACCESS_TOKEN_URL = settings.UCHILE_OAUTH2_ACCESS_TOKEN_URL
     USER_DATA_URL = settings.UCHILE_OAUTH2_USER_DATA_URL
 
+    REDIRECT_STATE = False
     ACCESS_TOKEN_METHOD = "POST"
     DEFAULT_SCOPE = ["openid"]
     EXTRA_DATA = [
