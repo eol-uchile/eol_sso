@@ -21,6 +21,7 @@ from eol_sso.pipeline import provision_user, resolve_uid
 from eol_sso.ph_correos_query import (
     EmailAttribute,
     NestedEmail,
+    EmailType,
     extract_and_split_emails,
     process_persona_data,
 )
@@ -54,7 +55,11 @@ def make_email_node(address, fecha, vigencia="1", principal=False):
     attrs = []
     if principal:
         attrs.append(
-            EmailAttribute(fecha_registro=fecha, nombre="PRINCIPAL", vigencia="1")
+            EmailAttribute(
+                fecha_registro=fecha,
+                vigencia="1",
+                tipo_email=[EmailType(id_tipo_email=1, nombre="PRINCIPAL")],
+            )
         )
     return NestedEmail(
         email=address,
@@ -68,7 +73,11 @@ def make_raw_email(address, fecha, vigencia="1", principal=False):
     attrs = []
     if principal:
         attrs.append(
-            {"fecha_registro": fecha, "nombre": "PRINCIPAL", "vigencia": "1"}
+            {
+                "fecha_registro": fecha,
+                "vigencia": "1",
+                "tipo_email": [{"id_tipo_email": 1, "nombre": "PRINCIPAL"}],
+            }
         )
     return {
         "email": address,
