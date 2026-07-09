@@ -193,7 +193,8 @@ def extract_and_split_emails(validated_email_list):
             continue
 
         is_principal = any(
-            attr.vigencia == "1" and attr.nombre == "PRINCIPAL"
+            attr.vigencia == "1"
+            and any(tipo.nombre == "PRINCIPAL" for tipo in attr.tipo_email)
             for attr in node.atributos_email
         )
 

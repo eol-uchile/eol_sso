@@ -12,10 +12,15 @@ from .utils import extract_and_split_emails
 
 logger = logging.getLogger(__name__)
 
+class EmailType(BaseModel):
+    id_tipo_email: int
+    nombre: str
+
+
 class EmailAttribute(BaseModel):
     fecha_registro: str
-    nombre: str
     vigencia: str
+    tipo_email: List[EmailType]
 
 
 class NestedEmail(BaseModel):
@@ -60,7 +65,8 @@ def fetch_external_persona_data(indiv_id):
             )
             return []
 
-        persona_list = api_data.get("getRowsPersona", [])
+        rows_persona = api_data.get("getRowsPersona", {})
+        persona_list = rows_persona.get("persona", [])
 
         if not persona_list:
             logger.warning(
