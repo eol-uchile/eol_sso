@@ -32,6 +32,7 @@ class NestedEmail(BaseModel):
 
 class ExternalPersona(BaseModel):
     id_persona: int
+    indiv_id: str
     nombres: str
     paterno: str
     materno: str
@@ -106,6 +107,7 @@ def process_persona_data(persona_list):
 
     return {
         "id_persona": persona.id_persona,
+        "indiv_id": persona.indiv_id,
         "nombres": persona.nombres,
         "paterno": persona.paterno,
         "materno": persona.materno,
