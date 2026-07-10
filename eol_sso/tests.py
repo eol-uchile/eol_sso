@@ -159,6 +159,7 @@ class ProcessPersonaDataTests(SimpleTestCase):
     def _raw_persona(self, **overrides):
         base = {
             "id_persona": 100,
+            "indiv_id": "12345678-9",
             "nombres": "Nombre",
             "paterno": "Paterno",
             "materno": "Materno",
@@ -174,6 +175,7 @@ class ProcessPersonaDataTests(SimpleTestCase):
         result = process_persona_data([self._raw_persona()])
 
         self.assertEqual(result["id_persona"], 100)
+        self.assertEqual(result["indiv_id"], "12345678-9")
         self.assertEqual(result["nombres"], "Nombre")
         self.assertEqual(result["paterno"], "Paterno")
         self.assertEqual(result["materno"], "Materno")
