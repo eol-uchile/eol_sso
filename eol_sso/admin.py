@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import UserSso
+from .models import UserIndivId, UserSso
 
 
 # Register your models here.
@@ -16,3 +16,4 @@ class IndivIdTableAdmin(admin.ModelAdmin):
     ordering = ['user__username']
 
 admin.site.register(UserSso, PhTableAdmin)
+admin.site.register(UserIndivId, IndivIdTableAdmin)
