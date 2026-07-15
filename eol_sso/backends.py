@@ -2,6 +2,9 @@
 from django.conf import settings
 from social_core.backends.oauth import BaseOAuth2
 
+# Internal project dependencies
+from eol_sso.models import UserIndivId
+
 
 class UchileOAuth2Backend(BaseOAuth2):
     """
@@ -44,3 +47,12 @@ class UchileOAuth2Backend(BaseOAuth2):
         return {
             "identification": response.get("identification", ""),
         }
+
+    def disconnect(self, *args, **kwargs): 
+        """
+        Override of BaseOAuth2.disconnect to unlink the learner from its indiv_id if associated.
+        """
+        user = kwargs.get('user', None)
+        if user is not None:
+            UserIndivId.objects.filter(user=user).delete()
+        return super().disconnect(*args, **kwargs)
