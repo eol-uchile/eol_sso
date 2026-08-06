@@ -29,5 +29,4 @@ class EolSsoConfig(AppConfig):
     }
 
     def ready(self):
-        if apps.is_installed('uchileedxlogin'):
-            from . import signals_uchileedxlogin
+        pass

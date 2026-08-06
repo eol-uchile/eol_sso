@@ -2,14 +2,17 @@ import setuptools
 
 setuptools.setup(
     name="eol_sso",
-    version="1.3.1",
+    version="1.4.0",
     author="EOL Uchile",
     author_email="eol-ing@uchile.cl",
     description="Middleware between apps and uchileedxlogin/eol_sso_login",
     long_description="Middleware between apps and uchileedxlogin/eol_sso_login",
     url="https://github/eol-uchile/eol_sso",
     packages=setuptools.find_packages(),
-    install_requires=[],
+    install_requires=[
+        "pydantic>=2.0,<2.11",
+        "unidecode>=1.1.1"
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
