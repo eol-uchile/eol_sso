@@ -1,95 +1,84 @@
 # Python Standard Libraries
-from http import HTTPStatus
 import logging
 import requests
+from typing import List
 
 # Installed packages (via pip)
 from django.conf import settings
+from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
-def _get_user_data(query_values, query_type):
+class NestedPasaporte(BaseModel):
+    usuario: str
+
+
+class ExternalPersonaByUsername(BaseModel):
+    id_persona: int
+    indiv_id: str
+    pasaporte: List[NestedPasaporte] = Field(min_length=1)
+
+
+def get_persona_by_username_bulk(usernames):
     """
-    Get the users data from PH API, query types can be either indiv_id or usuario.
-    It makes a single query for all values in query_values, if some values are not found
-    in PH, they won't be on the return value. If not a single value is found return an
-    empty dictionary.
+    Fetch and process persona data for multiple username in one API call.
+
+    Query the external API for multiple usuarios in a single request and validates their
+    format. Every record here is validated independently, one invalid record is logged and
+    skipped without discarding the rest of the batch.
+
+    Returns a dict keyed by username -> clean persona dict. username not
+    found in the API response are simply absent from the result, callers
+    should treat a missing key as "not found", the same as a single lookup
+    returning an empty dict.
     """
-    if query_type not in ["indiv_id", "usuario"]:
-        raise ValueError("query_type must be either 'indiv_id' or 'usuario'")
     headers = {
         'AppKey': settings.SSOLOGIN_UCHILE_KEY,
         'Origin': settings.LMS_ROOT_URL
     }
-    quoted_values = [f'"{v}"' for v in query_values]
-    query_string = ",".join(quoted_values)
-    params = {
-        query_type: query_string
-    }
-    result = requests.get(settings.BASE_EOL_SSO_API_URL, headers=headers, params=params)
-    if result.status_code == HTTPStatus.NO_CONTENT:
+    quoted_values = [f'"{v}"' for v in usernames]
+    params = {"usuario": ",".join(quoted_values)}
+
+    try:
+        response = requests.get(settings.BASE_EOL_SSO_API_URL_PROFILE, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+
+    except requests.exceptions.RequestException as e:
+        logger.error("Failed to connect to external API for bulk query: %s", e)
         return {}
-    if result.status_code != HTTPStatus.OK:
-        logger.error(
-            "PH API returned unexpected status code: {}, data: {}".format(
-                result.status_code, query_values))
-        raise Exception(
-            "PH API returned unexpected status code: {}, data: {}".format(
-                result.status_code, query_values))
-    
-    data = result.json()
-    if data["data"]["getRowsPersona"] is None:
-        logger.error(
-            "Missing 'getRowsPersona' in API response, status_code: {}, body: {}, query_value: {}".format(
-                result.status_code,
-                result.text,
-                query_values))
-        raise Exception(
-            "Missing 'getRowsPersona' in API response, status_code: {}, query_value: {}".format(
-                result.status_code, query_values))
-    if data['data']['getRowsPersona']['status_code'] != HTTPStatus.OK:
-        logger.error(
-            "PH API returned error status {}, expected 200, body: {}, username: {}".format(
-                data['data']['getRowsPersona']['status_code'],
-                result.text,
-                query_values))
-        raise Exception(
-            "PH API returned error status {}, expected 200, query_value: {}".format(
-                result.status_code, query_values))
-    return data
 
-def get_user_data_by_indiv_id(query_values):
-        """
-        get_user_data wrapper for the case when needing user information about users querying
-        by indiv_id
-        """
-        data = _get_user_data(query_values, 'indiv_id')
-        rows_persona = data.get("data", {}).get("getRowsPersona", {})    
-        api_message = rows_persona.get("message", "")
-        if "Persona SRCEI" in api_message:
-            logger.info(f"PH API returned info from SRCEI for {query_values}, not info associated with the actual account.")
-            return {}
-        # Iterate over the users
-        user_data = {}
-        persona_list = rows_persona.get('persona', [])
-        for user in persona_list:
-            user_data[user['indiv_id']] = {
-                'indiv_id': user['indiv_id'],
-                'id_persona': user['id_persona']
-            }
-        return user_data
+    payload = response.json()
+    api_data = payload.get("data")
 
-def get_user_data_by_username(query_values):
-        """
-        get_user_data wrapper for the case when needing user information about users querying
-        by username/usuario
-        """
-        data = _get_user_data(query_values, 'usuario')
-        # Iterate over the users
-        user_data = {}
-        for user in data["data"]["getRowsPersona"]['persona']:
-            user_data[user['pasaporte'][0]['usuario']] = {
-                        'indiv_id': user['indiv_id'],
-                        'id_persona': user['id_persona']
-                    }
-        return user_data
+    if api_data is None:
+        logger.error(
+            "External API returned no data for bulk query. Errors: %s", payload.get("errors")
+        )
+        return {}
+
+    rows_persona = api_data.get("getRowsPersona", {})
+    persona_list = rows_persona.get("persona", [])
+
+    if not persona_list:
+        logger.warning(
+            "External API returned an empty persona list for bulk query of %d usernames.",
+            len(usernames),
+        )
+        return {}
+
+    # Validate persona format
+    results = {}
+    for raw_persona in persona_list:
+        try:
+            persona = ExternalPersonaByUsername.model_validate(raw_persona)
+        except ValidationError as e:
+            logger.error("Persona validation failed in bulk fetch: %s", e)
+            continue
+        entry = {
+            "id_persona": persona.id_persona,
+            "indiv_id": persona.indiv_id,
+            "usuario": persona.pasaporte[0].usuario
+        }
+        results[entry["usuario"]] = entry
+
+    return results
