@@ -5,3 +5,4 @@ def plugin_settings(settings):
     settings.UCHILE_OAUTH2_AUTHORIZATION_URL = 'https://api.example.cl/'
     settings.UCHILE_OAUTH2_ACCESS_TOKEN_URL = 'https://api.example.cl/'
     settings.UCHILE_OAUTH2_USER_DATA_URL = 'https://api.example.cl/'
+    settings.BASE_EOL_SSO_API_URL_PROFILE = 'https://api.example.cl/'
