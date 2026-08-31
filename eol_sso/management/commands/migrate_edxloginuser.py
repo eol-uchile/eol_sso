@@ -36,7 +36,7 @@ class Command(BaseMigrationCommand):
         self.check_target_state()
  
         batch_size = options['batch_size']
-        sleep_time = options['sleep']
+        sleep_time = self.get_sleep_time(options)
         dry_run = options['dry_run']
 
         done_with_sso = UserSocialAuth.objects.filter(
@@ -130,10 +130,8 @@ class Command(BaseMigrationCommand):
                 logger.error(f"DB error when trying to save batch: {e}")
                 break
  
-            # Given the rate limiter in the PH API, a sleep timer between batches could
-            # be necessary.
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+            # Sleep between batches to avoid hitting the PH API rate limit.
+            time.sleep(sleep_time)
  
         logger.info(f"EdxLoginUser migration complete. Migrated={total_migrated}, Skipped={total_skipped}.")
  
