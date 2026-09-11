@@ -8,6 +8,7 @@ from django.contrib.auth.models import BaseUserManager
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from social_django.models import UserSocialAuth
 
 # Edx dependencies
 from openedx.core.djangoapps.user_authn.views.registration_form import AccountCreationForm
@@ -285,3 +286,23 @@ def provision_user_from_indiv_id(indiv_id, existing_user=None, persona_data=None
         link_indiv_id(user, indiv_id)
 
     return user, user_data
+
+def create_social_auth_entry(user, user_data):
+    """
+    Create the UserSocialAuth entry linking user to id_persona under the
+    uchile-oauth2 backend. Mirrors what PSA's associate_user pipeline step
+    does during a live login, since this factory runs outside that pipeline
+    entirely.
+    """
+    expected_uid = str(user_data["id_persona"])
+    social_auth, created = UserSocialAuth.objects.get_or_create(
+        user=user,
+        provider=UchileOAuth2Backend.name,
+        defaults={"uid": expected_uid},
+    )
+    if not created and social_auth.uid != expected_uid:
+        logger.error(
+            "UserSocialAuth uid mismatch for user_id=%s: existing '%s' != expected '%s'.",
+            user.id, social_auth.uid, expected_uid,
+        )
+    return social_auth
